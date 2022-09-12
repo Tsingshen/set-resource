@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"reflect"
+	"sync/atomic"
 	"time"
 
 	"github.com/Tsingshen/k8scrd/client"
@@ -19,12 +20,14 @@ import (
 )
 
 var (
-	CONTAINER_APP_NAME = "app"
+	CONTAINER_APP_NAME        = "app"
+	updateDeployRateMax int32 = 20
 )
 
 type LocalConfig struct {
-	Resource         configResource `yaml:"resource"`
-	IncludeNamespace []string       `yaml:"includeNamespace"`
+	Resource            configResource `yaml:"resource"`
+	IncludeNamespace    []string       `yaml:"includeNamespace"`
+	UpdateDeployRateMax int32          `yaml:"updateDeployRateMax"`
 }
 
 type configResource struct {
@@ -66,7 +69,7 @@ func main() {
 
 	viper.WatchConfig()
 	viper.OnConfigChange(func(in fsnotify.Event) {
-		if in.Op == fsnotify.Write {
+		if in.Op&fsnotify.Write == fsnotify.Write {
 			if err := viper.Unmarshal(&lc); err != nil {
 				panic(err)
 			}
@@ -87,13 +90,12 @@ func main() {
 
 func watchDeploymentResource(cs *kubernetes.Clientset, lc *LocalConfig, ch chan struct{}) error {
 	informersFatory := informers.NewSharedInformerFactory(cs, time.Minute*1)
-
 	deployInformer := informersFatory.Apps().V1().Deployments()
 	watchNs := lc.IncludeNamespace
 
-	if watchNs != nil {
-		deployInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
+	deployInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			if watchNs != nil {
 				deploy := obj.(*appsv1.Deployment)
 				if checkSliceIncludeStr(watchNs, deploy.Namespace) {
 					deployAnno := deploy.Annotations
@@ -123,8 +125,11 @@ func watchDeploymentResource(cs *kubernetes.Clientset, lc *LocalConfig, ch chan 
 
 				}
 
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
+			}
+		},
+
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			if watchNs != nil {
 				oldDeploy := oldObj.(*appsv1.Deployment)
 				newDeploy := newObj.(*appsv1.Deployment)
 
@@ -162,19 +167,17 @@ func watchDeploymentResource(cs *kubernetes.Clientset, lc *LocalConfig, ch chan 
 						}
 					}
 				}
+			}
+		},
+	})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
 
-			},
-		})
-		stopCh := make(chan struct{})
-		defer close(stopCh)
+	// start informer
+	informersFatory.Start(stopCh)
+	informersFatory.WaitForCacheSync(stopCh)
 
-		// start informer
-		informersFatory.Start(stopCh)
-		informersFatory.WaitForCacheSync(stopCh)
-
-		stopCh <- <-ch
-
-	}
+	stopCh <- <-ch
 
 	return nil
 
@@ -226,30 +229,38 @@ func (lc *LocalConfig) updateDeployResource(cs *kubernetes.Clientset, d *appsv1.
 	// for the sake of loop run nothing
 	time.Sleep(time.Millisecond * 500)
 
-	dCopy := d.DeepCopy()
-	c := dCopy.Spec.Template.Spec.Containers
+	lc.UpdateDeployRateMax = updateDeployRateMax
+	leftToken := atomic.AddInt32(&lc.UpdateDeployRateMax, -1)
+	defer atomic.AddInt32(&lc.UpdateDeployRateMax, 1)
+	if leftToken > 0 {
+		dCopy := d.DeepCopy()
+		c := dCopy.Spec.Template.Spec.Containers
 
-	for k, v := range c {
-		if v.Name == CONTAINER_APP_NAME {
-			c[k].Resources = corev1.ResourceRequirements{
-				Limits: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse(lc.Resource.Limits.Cpu),
-					corev1.ResourceMemory: resource.MustParse(lc.Resource.Limits.Memory),
-				},
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse(lc.Resource.Requests.Cpu),
-					corev1.ResourceMemory: resource.MustParse(lc.Resource.Requests.Memory),
-				},
+		for k, v := range c {
+			if v.Name == CONTAINER_APP_NAME {
+				c[k].Resources = corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse(lc.Resource.Limits.Cpu),
+						corev1.ResourceMemory: resource.MustParse(lc.Resource.Limits.Memory),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse(lc.Resource.Requests.Cpu),
+						corev1.ResourceMemory: resource.MustParse(lc.Resource.Requests.Memory),
+					},
+				}
+				dCopy.ResourceVersion = ""
+				_, err := cs.AppsV1().Deployments(dCopy.Namespace).Update(context.Background(), dCopy, metav1.UpdateOptions{
+					FieldManager: "set-resource-client",
+				})
+				log.Printf("update deployment %s/%s with resource limit: %s,%s, request: %s,%s\n",
+					dCopy.Namespace, dCopy.Name, lc.Resource.Requests.Cpu, lc.Resource.Requests.Memory, lc.Resource.Limits.Cpu, lc.Resource.Limits.Memory)
+				if err != nil {
+					return err
+				}
+				break
 			}
-			_, err := cs.AppsV1().Deployments(dCopy.Namespace).Update(context.Background(), dCopy, metav1.UpdateOptions{
-				FieldManager: "set-resource-client",
-			})
-			log.Printf("update deployment %s/%s with default resource which you set\n", dCopy.Namespace, dCopy.Name)
-			if err != nil {
-				return err
-			}
-			break
 		}
+
 	}
 
 	return nil
