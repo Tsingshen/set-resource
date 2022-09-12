@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"reflect"
 	"sync/atomic"
@@ -17,6 +18,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -44,7 +46,7 @@ func main() {
 	var lc = &LocalConfig{}
 	cs := client.GetClient()
 	ch := make(chan struct{})
-	// set viper
+	// set viper config
 
 	viper.SetConfigName("config.yaml")
 	viper.SetConfigType("yaml")
@@ -59,7 +61,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Set-resource Request: cpu=%s,mem=%s, Limit: cpu=%s,mem=%s\n", lc.Resource.Requests.Cpu, lc.Resource.Requests.Memory, lc.Resource.Limits.Cpu, lc.Resource.Limits.Memory)
+		log.Printf("set-resource Request: cpu=%s,mem=%s, Limit: cpu=%s,mem=%s\n", lc.Resource.Requests.Cpu, lc.Resource.Requests.Memory, lc.Resource.Limits.Cpu, lc.Resource.Limits.Memory)
 		err = watchDeploymentResource(cs, lc, ch)
 		if err != nil {
 			panic(err)
@@ -75,7 +77,7 @@ func main() {
 			}
 			ch <- struct{}{}
 			go func() {
-				log.Printf("Set-resource Request: cpu=%s,mem=%s, Limit: cpu=%s,mem=%s\n", lc.Resource.Requests.Cpu, lc.Resource.Requests.Memory, lc.Resource.Limits.Cpu, lc.Resource.Limits.Memory)
+				log.Printf("set-resource Request: cpu=%s,mem=%s, Limit: cpu=%s,mem=%s\n", lc.Resource.Requests.Cpu, lc.Resource.Requests.Memory, lc.Resource.Limits.Cpu, lc.Resource.Limits.Memory)
 				err = watchDeploymentResource(cs, lc, ch)
 				if err != nil {
 					panic(err)
@@ -249,12 +251,16 @@ func (lc *LocalConfig) updateDeployResource(cs *kubernetes.Clientset, d *appsv1.
 					},
 				}
 				dCopy.ResourceVersion = ""
-				_, err := cs.AppsV1().Deployments(dCopy.Namespace).Update(context.Background(), dCopy, metav1.UpdateOptions{
+				deploy, err := cs.AppsV1().Deployments(dCopy.Namespace).Update(context.Background(), dCopy, metav1.UpdateOptions{
 					FieldManager: "set-resource-client",
 				})
 				log.Printf("update deployment %s/%s with resource limit: %s,%s, request: %s,%s\n",
 					dCopy.Namespace, dCopy.Name, lc.Resource.Requests.Cpu, lc.Resource.Requests.Memory, lc.Resource.Limits.Cpu, lc.Resource.Limits.Memory)
 				if err != nil {
+					return err
+				}
+
+				if err := waitDeploymentUpdate(cs, deploy); err != nil {
 					return err
 				}
 				break
@@ -278,4 +284,26 @@ func checkSliceIncludeStr(s []string, str string) bool {
 	}
 
 	return false
+}
+
+func waitDeploymentUpdate(cs *kubernetes.Clientset, d *appsv1.Deployment) error {
+	if d == nil {
+		return fmt.Errorf("can not watch nil deployment update  nil")
+	}
+
+	if d.Spec.Replicas == pointer.Int32Ptr(0) {
+		return nil
+	}
+
+	for i := 0; i < 200; i++ {
+		time.Sleep(3 * time.Second)
+		if d.Status.AvailableReplicas == d.Status.Replicas && d.Status.ReadyReplicas == d.Status.Replicas &&
+			d.Status.UpdatedReplicas == d.Status.Replicas {
+			break
+		}
+		if i == 199 {
+			return fmt.Errorf("wait for 6 minutes deployment = %s/%s not update success, skip watch update", d.Namespace, d.Name)
+		}
+	}
+	return nil
 }
