@@ -89,7 +89,7 @@ func main() {
 }
 
 func watchDeploymentResource(cs *kubernetes.Clientset, lc *LocalConfig, ch chan struct{}) error {
-	informersFatory := informers.NewSharedInformerFactory(cs, time.Minute*1)
+	informersFatory := informers.NewSharedInformerFactory(cs, time.Minute*10)
 	deployInformer := informersFatory.Apps().V1().Deployments()
 	watchNs := lc.IncludeNamespace
 
