@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: shencq
+commonLabels:
+  app: set-resource
+resources:
+- ../../base
+- ./config.yaml
+patchesStrategicMerge:
+- patches.yaml
+images:
+- name: app_image
+  newName: ccr.ccs.tencentyun.com/lzwk/ci-cd-tools
+  newTag: dev-set-resources-v0.0.2
+
+

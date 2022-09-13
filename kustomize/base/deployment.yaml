@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: set-resource
+spec:
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+      - image: app_image
+        imagePullPolicy: IfNotPresent
+        name: set-resource
+        resources:
+          limits:
+            cpu: 1 
+            memory: 512Mi
+          requests:
+            cpu: 20m
+            memory: 64Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        workingDir: /app
+      imagePullSecrets:
+      - name: qcloudregistrykey
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      serviceAccount: set-resource
+      serviceAccountName: set-resource
+      terminationGracePeriodSeconds: 15
