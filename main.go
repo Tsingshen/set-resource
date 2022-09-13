@@ -140,7 +140,7 @@ func watchDeploymentResource(cs *kubernetes.Clientset, lc *LocalConfig, ch chan 
 					v, ok := deployAnno["not-reset-resources"]
 					if ok {
 						if v == "true" {
-							log.Printf("depoyment %s/%s set anno not-reset-resource, skip updateFunc\n", newDeploy.Namespace, newDeploy.Name)
+							log.Printf("deployment %s/%s set anno not-reset-resource, skip updateFunc\n", newDeploy.Namespace, newDeploy.Name)
 							return
 						}
 					}
