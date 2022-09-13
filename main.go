@@ -296,14 +296,14 @@ func waitDeploymentUpdate(cs *kubernetes.Clientset, d *appsv1.Deployment) error 
 		return nil
 	}
 
-	for i := 0; i < 200; i++ {
+	for i := 0; i < 20; i++ {
 		time.Sleep(3 * time.Second)
 		if d.Status.AvailableReplicas == d.Status.Replicas && d.Status.ReadyReplicas == d.Status.Replicas &&
 			d.Status.UpdatedReplicas == d.Status.Replicas {
 			break
 		}
-		if i == 199 {
-			return fmt.Errorf("wait for 6 minutes deployment = %s/%s not update success, skip watch update", d.Namespace, d.Name)
+		if i == 19 {
+			return fmt.Errorf("wait for 1 minutes deployment = %s/%s not update success, skip watch update", d.Namespace, d.Name)
 		}
 	}
 	return nil
