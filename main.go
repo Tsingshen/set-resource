@@ -71,7 +71,7 @@ func main() {
 
 	viper.WatchConfig()
 	viper.OnConfigChange(func(in fsnotify.Event) {
-		if in.Op&fsnotify.Write == fsnotify.Write {
+		if in.Op&fsnotify.Write == fsnotify.Write || in.Op&fsnotify.Create == fsnotify.Create {
 			if err := viper.Unmarshal(&lc); err != nil {
 				panic(err)
 			}
