@@ -27,12 +27,12 @@ var (
 )
 
 type LocalConfig struct {
-	Resource            configResource `yaml:"resource"`
+	Resource            ConfigResource `yaml:"resource"`
 	IncludeNamespace    []string       `yaml:"includeNamespace"`
 	UpdateDeployRateMax int32          `yaml:"updateDeployRateMax"`
 }
 
-type configResource struct {
+type ConfigResource struct {
 	Requests CpuAndMem `yaml:"requests"`
 	Limits   CpuAndMem `yaml:"limits"`
 }
