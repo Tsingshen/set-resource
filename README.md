@@ -1,4 +1,25 @@
-Contoller the resource of deployment be limited
+## Contoller the resource of deployment be limited
 
-TODO:
-- restart deployment at setting limit rate
+### config.yaml模板
+```
+includeNamespace:
+- beta1
+resource:
+  requests:
+    cpu: 10m
+    memory: 56Mi
+  limits:
+    cpu: 2000m
+    memory: 2048Mi
+```
+
+## ignore deployment
+set deployment annotations to ignore
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    not-reset-resources: "true"
+```
+

@@ -254,8 +254,9 @@ func (lc *LocalConfig) updateDeployResource(cs *kubernetes.Clientset, d *appsv1.
 				deploy, err := cs.AppsV1().Deployments(dCopy.Namespace).Update(context.Background(), dCopy, metav1.UpdateOptions{
 					FieldManager: "set-resource-client",
 				})
-				log.Printf("update deployment %s/%s with resource limit: %s,%s, request: %s,%s\n",
-					dCopy.Namespace, dCopy.Name, lc.Resource.Requests.Cpu, lc.Resource.Requests.Memory, lc.Resource.Limits.Cpu, lc.Resource.Limits.Memory)
+				log.Printf("update deployment with resource limit: %s,%s, request: %s,%s, %s/%s\n",
+					lc.Resource.Requests.Cpu, lc.Resource.Requests.Memory, lc.Resource.Limits.Cpu, lc.Resource.Limits.Memory,
+					dCopy.Namespace, dCopy.Name)
 				if err != nil {
 					return err
 				}
@@ -288,7 +289,7 @@ func checkSliceIncludeStr(s []string, str string) bool {
 
 func waitDeploymentUpdate(cs *kubernetes.Clientset, d *appsv1.Deployment) error {
 	if d == nil {
-		return fmt.Errorf("can not watch nil deployment update  nil")
+		return fmt.Errorf("can not watch nil deployment update")
 	}
 
 	if d.Spec.Replicas == pointer.Int32Ptr(0) {
