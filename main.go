@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"sync/atomic"
 	"time"
 
 	"github.com/Tsingshen/k8scrd/client"
@@ -172,6 +171,7 @@ func watchDeploymentResource(cs *kubernetes.Clientset, lc *LocalConfig, ch chan 
 			}
 		},
 	})
+
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
@@ -232,42 +232,37 @@ func (lc *LocalConfig) updateDeployResource(cs *kubernetes.Clientset, d *appsv1.
 	time.Sleep(time.Millisecond * 500)
 
 	lc.UpdateDeployRateMax = updateDeployRateMax
-	leftToken := atomic.AddInt32(&lc.UpdateDeployRateMax, -1)
-	defer atomic.AddInt32(&lc.UpdateDeployRateMax, 1)
-	if leftToken > 0 {
-		dCopy := d.DeepCopy()
-		c := dCopy.Spec.Template.Spec.Containers
+	dCopy := d.DeepCopy()
+	c := dCopy.Spec.Template.Spec.Containers
 
-		for k, v := range c {
-			if v.Name == CONTAINER_APP_NAME {
-				c[k].Resources = corev1.ResourceRequirements{
-					Limits: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse(lc.Resource.Limits.Cpu),
-						corev1.ResourceMemory: resource.MustParse(lc.Resource.Limits.Memory),
-					},
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse(lc.Resource.Requests.Cpu),
-						corev1.ResourceMemory: resource.MustParse(lc.Resource.Requests.Memory),
-					},
-				}
-				dCopy.ResourceVersion = ""
-				deploy, err := cs.AppsV1().Deployments(dCopy.Namespace).Update(context.Background(), dCopy, metav1.UpdateOptions{
-					FieldManager: "set-resource-client",
-				})
-				log.Printf("update deployment with resource limit: %s,%s, request: %s,%s, %s/%s\n",
-					lc.Resource.Requests.Cpu, lc.Resource.Requests.Memory, lc.Resource.Limits.Cpu, lc.Resource.Limits.Memory,
-					dCopy.Namespace, dCopy.Name)
-				if err != nil {
-					return err
-				}
-
-				if err := waitDeploymentUpdate(cs, deploy); err != nil {
-					return err
-				}
-				break
+	for k, v := range c {
+		if v.Name == CONTAINER_APP_NAME {
+			c[k].Resources = corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse(lc.Resource.Limits.Cpu),
+					corev1.ResourceMemory: resource.MustParse(lc.Resource.Limits.Memory),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse(lc.Resource.Requests.Cpu),
+					corev1.ResourceMemory: resource.MustParse(lc.Resource.Requests.Memory),
+				},
 			}
-		}
+			dCopy.ResourceVersion = ""
+			deploy, err := cs.AppsV1().Deployments(dCopy.Namespace).Update(context.Background(), dCopy, metav1.UpdateOptions{
+				FieldManager: "set-resource-client",
+			})
+			log.Printf("update deployment with resource limit: %s,%s, request: %s,%s, %s/%s\n",
+				lc.Resource.Requests.Cpu, lc.Resource.Requests.Memory, lc.Resource.Limits.Cpu, lc.Resource.Limits.Memory,
+				dCopy.Namespace, dCopy.Name)
+			if err != nil {
+				return err
+			}
 
+			if err := waitDeploymentUpdate(cs, deploy); err != nil {
+				return err
+			}
+			break
+		}
 	}
 
 	return nil
