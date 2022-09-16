@@ -23,3 +23,5 @@ metadata:
     not-reset-resources: "true"
 ```
 
+## todo
+update deployment with goroutine and tokenbucket
