@@ -11,6 +11,6 @@ patchesStrategicMerge:
 images:
 - name: app_image
   newName: ccr.ccs.tencentyun.com/lzwk/ci-cd-tools
-  newTag: dev-set-resources-v0.0.3
+  newTag: dev-set-resources-v0.0.5
 
 

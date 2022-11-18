@@ -7,3 +7,9 @@ resource:
   limits:
     cpu: 2000m
     memory: 2048Mi
+ekletDeployment:
+  deployment:
+  - shencq/centos
+  nodeSelector:
+    "ops.lzwk.com/node-type": eklet
+  prefix: "eklet-"

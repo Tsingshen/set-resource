@@ -11,6 +11,12 @@ resource:
   limits:
     cpu: 2000m
     memory: 2048Mi
+ekletDeployment:
+  deployment:
+  - shencq/centos
+  nodeSelector:
+    "ops.lzwk.com/node-type": eklet
+  prefix: "eklet-"
 ```
 
 ## ignore deployment
@@ -23,5 +29,3 @@ metadata:
     not-reset-resources: "true"
 ```
 
-## todo
-update deployment with goroutine and tokenbucket
