@@ -14,6 +14,8 @@ spec:
       containers:
       - image: app_image
         imagePullPolicy: IfNotPresent
+        - --set-resource
+        - --eklet-deployment
         name: set-resource
         resources:
           limits:

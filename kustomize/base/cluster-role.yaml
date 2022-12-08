@@ -10,6 +10,13 @@ metadata:
   name: set-resource
 rules:
 - apiGroups:
+  - "autoscaling.cloud.tencent.com"
+  resources:
+  - horizontalpodcronscalers
+  verbs:
+  - create
+  - delete
+- apiGroups:
   - "apps"
   resources:
   - deployments
@@ -18,6 +25,8 @@ rules:
   - list
   - watch
   - update
+  - create
+  - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

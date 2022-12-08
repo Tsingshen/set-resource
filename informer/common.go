@@ -194,12 +194,12 @@ func newEkletDeployment(d *appsv1.Deployment, lc *LocalConfig) *appsv1.Deploymen
 	dCopy.Spec.Replicas = pointer.Int32(0)
 	// add nodeSelector to eklet node
 	if dCopy.Spec.Template.Spec.NodeSelector == nil {
-		dCopy.Spec.Template.Spec.NodeSelector = make(map[string]string)
+		dCopy.Spec.Template.Spec.NodeSelector = make(map[string]string, 1)
 	}
 	dCopy.Spec.Template.Spec.NodeSelector = lc.EkletDeployment.NodeSelector
 	//add ds-inject anno
 	if dCopy.Spec.Template.Annotations == nil {
-		dCopy.Spec.Template.Annotations = make(map[string]string)
+		dCopy.Spec.Template.Annotations = make(map[string]string, 1)
 	}
 	dCopy.Spec.Template.Annotations["eks.tke.cloud.tencent.com/ds-injection"] = "true"
 	// add eklet node toreration
@@ -210,7 +210,7 @@ func newEkletDeployment(d *appsv1.Deployment, lc *LocalConfig) *appsv1.Deploymen
 	})
 	// add not-reset-resources anno
 	if dCopy.Annotations == nil {
-		dCopy.Annotations = make(map[string]string)
+		dCopy.Annotations = make(map[string]string, 1)
 	}
 	dCopy.Annotations["not-reset-resources"] = "true"
 
